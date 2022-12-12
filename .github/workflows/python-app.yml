@@ -31,6 +31,6 @@ jobs:
          sleep 30
     - name: Dags
       run: |
-         cp ./dags/* $AIRFLOW_HOME
+         cp dags/* $AIRFLOW_HOME
          cd $AIRFLOW_HOME
          airflow dags report -v > report.log
