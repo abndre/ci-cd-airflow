@@ -27,12 +27,13 @@ jobs:
     - name: Start Airflow
       run: |
          export AIRFLOW_HOME=~/airflow
+         export AIRFLOW__CORE__LOAD_EXAMPLES=false
          airflow standalone &> airflow.log 2>&1 &
          sleep 30
     - name: Dags
       run: |
          export AIRFLOW_HOME=~/airflow
-         cp dags/* $AIRFLOW_HOME
+         cp dags/* $AIRFLOW_HOME/dags
          cd $AIRFLOW_HOME
          ls -l
          airflow dags report -v > report.log
