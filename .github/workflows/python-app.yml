@@ -31,6 +31,7 @@ jobs:
          sleep 30
     - name: Dags
       run: |
+         export AIRFLOW_HOME=~/airflow
          cp dags/* $AIRFLOW_HOME
          cd $AIRFLOW_HOME
          airflow dags report -v > report.log
