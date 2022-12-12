@@ -34,4 +34,11 @@ jobs:
          export AIRFLOW_HOME=~/airflow
          cp dags/* $AIRFLOW_HOME
          cd $AIRFLOW_HOME
+         ls -l
          airflow dags report -v > report.log
+         cat report.log
+         if grep -Fwq "ERROR" report.log
+         then
+            echo "Error detected!"
+            exit 1
+         fi
