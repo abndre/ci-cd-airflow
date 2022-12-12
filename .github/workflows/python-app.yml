@@ -27,7 +27,7 @@ jobs:
     - name: Start Airflow
       run: |
          export AIRFLOW_HOME=~/airflow
-         export AIRFLOW__CORE__LOAD_EXAMPLES=false
+         export AIRFLOW__CORE__LOAD_EXAMPLES=False
          airflow standalone &> airflow.log 2>&1 &
          sleep 30
     - name: Dags
@@ -37,7 +37,7 @@ jobs:
          cd $AIRFLOW_HOME
          ls -l
          airflow dags report -v > report.log
-         cat report.log
+         # cat report.log
          if grep -Fwq "ERROR" report.log
          then
             echo "Error detected!"
