@@ -37,7 +37,7 @@ jobs:
          cd $AIRFLOW_HOME
          ls -l
          airflow dags report -v > report.log
-         # cat report.log
+         cat report.log
          if grep -Fwq "ERROR" report.log
          then
             echo "Error detected!"
