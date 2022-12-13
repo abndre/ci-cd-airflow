@@ -38,7 +38,7 @@ jobs:
     - name: Dags
       run: |
          export AIRFLOW_HOME=~/airflow
-         export AIRFLOW__CORE__LOAD_EXAMPLES='false
+         export AIRFLOW__CORE__LOAD_EXAMPLES='false'
          cp dags/* $AIRFLOW_HOME/dags
          cd $AIRFLOW_HOME
          ls -l
