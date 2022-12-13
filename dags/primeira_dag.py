@@ -16,144 +16,120 @@
 # specific language governing permissions and limitations
 # under the License.
 """
-Example DAG demonstrating the usage of the TaskFlow API to execute Python functions natively and within a
-virtual environment.
+### DAG Tutorial Documentation
+This DAG is demonstrating an Extract -> Transform -> Load pipeline
 """
 from __future__ import annotations
 
-import logging
-import shutil
-import sys
-import tempfile
-import time
-from pprint import pprint
+# [START tutorial]
+# [START import_module]
+import json
+from textwrap import dedent
 
 import pendulum
 
+# The DAG object; we'll need this to instantiate a DAG
 from airflow import DAG
-from airflow.decorators import task
-from airflow.operators.python import ExternalPythonOperator, PythonVirtualenvOperator
 
-log = logging.getLogger(__name__)
+# Operators; we need this to operate!
+from airflow.operators.python import PythonOperator
 
-PATH_TO_PYTHON_BINARY = sys.executable
+# [END import_module]
 
-BASE_DIR = tempfile.gettempdir()
-
-
-def x():
-    pass
-
-
+# [START instantiate_dag]
 with DAG(
-    dag_id="example_python_operator",
+    "tutorial_dag",
+    # [START default_args]
+    # These args will get passed on to each operator
+    # You can override them on a per-task basis during operator initialization
+    default_args={"retries": 2},
+    # [END default_args]
+    description="DAG tutorial",
     schedule=None,
-    start_date=pendulum.datetime(2022, 1, 1, tz="UTC"),
+    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
     catchup=False,
     tags=["example"],
 ) as dag:
+    # [END instantiate_dag]
+    # [START documentation]
+    dag.doc_md = __doc__
+    # [END documentation]
 
-    # [START howto_operator_python]
-    @task(task_id="print_the_context")
-    def print_context(ds=None, **kwargs):
-        """Print the Airflow context and ds variable from the context."""
-        pprint(kwargs)
-        print(ds)
-        return "Whatever you return gets printed in the logs"
+    # [START extract_function]
+    def extract(**kwargs):
+        ti = kwargs["ti"]
+        data_string = '{"1001": 301.27, "1002": 433.21, "1003": 502.22}'
+        ti.xcom_push("order_data", data_string)
 
-    run_this = print_context()
-    # [END howto_operator_python]
+    # [END extract_function]
 
-    # [START howto_operator_python_render_sql]
-    @task(task_id="log_sql_query", templates_dict={"query": "sql/sample.sql"}, templates_exts=[".sql"])
-    def log_sql(**kwargs):
-        logging.info("Python task decorator query: %s", str(kwargs["templates_dict"]["query"]))
+    # [START transform_function]
+    def transform(**kwargs):
+        ti = kwargs["ti"]
+        extract_data_string = ti.xcom_pull(task_ids="extract", key="order_data")
+        order_data = json.loads(extract_data_string)
 
-    log_the_sql = log_sql()
-    # [END howto_operator_python_render_sql]
+        total_order_value = 0
+        for value in order_data.values():
+            total_order_value += value
 
-    # [START howto_operator_python_kwargs]
-    # Generate 5 sleeping tasks, sleeping from 0.0 to 0.4 seconds respectively
-    for i in range(5):
+        total_value = {"total_order_value": total_order_value}
+        total_value_json_string = json.dumps(total_value)
+        ti.xcom_push("total_order_value", total_value_json_string)
 
-        @task(task_id=f"sleep_for_{i}")
-        def my_sleeping_function(random_base):
-            """This is a function that will run within the DAG execution"""
-            time.sleep(random_base)
+    # [END transform_function]
 
-        sleeping_task = my_sleeping_function(random_base=float(i) / 10)
+    # [START load_function]
+    def load(**kwargs):
+        ti = kwargs["ti"]
+        total_value_string = ti.xcom_pull(task_ids="transform", key="total_order_value")
+        total_order_value = json.loads(total_value_string)
 
-        run_this >> log_the_sql >> sleeping_task
-    # [END howto_operator_python_kwargs]
+        print(total_order_value)
 
-    if not shutil.which("virtualenv"):
-        log.warning("The virtalenv_python example task requires virtualenv, please install it.")
-    else:
-        # [START howto_operator_python_venv]
-        @task.virtualenv(
-            task_id="virtualenv_python", requirements=["colorama==0.4.0"], system_site_packages=False
-        )
-        def callable_virtualenv():
-            """
-            Example function that will be performed in a virtual environment.
+    # [END load_function]
 
-            Importing at the module level ensures that it will not attempt to import the
-            library before it is installed.
-            """
-            from time import sleep
+    # [START main_flow]
+    extract_task = PythonOperator(
+        task_id="extract",
+        python_callable=extract,
+    )
+    extract_task.doc_md = dedent(
+        """\
+    #### Extract task
+    A simple Extract task to get data ready for the rest of the data pipeline.
+    In this case, getting data is simulated by reading from a hardcoded JSON string.
+    This data is then put into xcom, so that it can be processed by the next task.
+    """
+    )
 
-            from colorama import Back, Fore, Style
+    transform_task = PythonOperator(
+        task_id="transform",
+        python_callable=transform,
+    )
+    transform_task.doc_md = dedent(
+        """\
+    #### Transform task
+    A simple Transform task which takes in the collection of order data from xcom
+    and computes the total order value.
+    This computed value is then put into xcom, so that it can be processed by the next task.
+    """
+    )
 
-            print(Fore.RED + "some red text")
-            print(Back.GREEN + "and with a green background")
-            print(Style.DIM + "and in dim text")
-            print(Style.RESET_ALL)
-            for _ in range(4):
-                print(Style.DIM + "Please wait...", flush=True)
-                sleep(1)
-            print("Finished")
+    load_task = PythonOperator(
+        task_id="load",
+        python_callable=load,
+    )
+    load_task.doc_md = dedent(
+        """\
+    #### Load task
+    A simple Load task which takes in the result of the Transform task, by reading it
+    from xcom and instead of saving it to end user review, just prints it out.
+    """
+    )
 
-        virtualenv_task = callable_virtualenv()
-        # [END howto_operator_python_venv]
+    extract_task >> transform_task >> load_task
 
-        sleeping_task >> virtualenv_task
+# [END main_flow]
 
-        # [START howto_operator_external_python]
-        @task.external_python(task_id="external_python", python=PATH_TO_PYTHON_BINARY)
-        def callable_external_python():
-            """
-            Example function that will be performed in a virtual environment.
-
-            Importing at the module level ensures that it will not attempt to import the
-            library before it is installed.
-            """
-            import sys
-            from time import sleep
-
-            print(f"Running task via {sys.executable}")
-            print("Sleeping")
-            for _ in range(4):
-                print("Please wait...", flush=True)
-                sleep(1)
-            print("Finished")
-
-        external_python_task = callable_external_python()
-        # [END howto_operator_external_python]
-
-        # [START howto_operator_external_python_classic]
-        external_classic = ExternalPythonOperator(
-            task_id="external_python_classic",
-            python=PATH_TO_PYTHON_BINARY,
-            python_callable=x,
-        )
-        # [END howto_operator_external_python_classic]
-
-        # [START howto_operator_python_venv_classic]
-        virtual_classic = PythonVirtualenvOperator(
-            task_id="virtualenv_classic",
-            requirements="colorama==0.4.0",
-            python_callable=x,
-        )
-        # [END howto_operator_python_venv_classic]
-
-        run_this >> external_classic >> external_python_task >> virtual_classic
+# [END tutorial]
