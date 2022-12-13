@@ -27,7 +27,7 @@ jobs:
     - name: Start Airflow
       run: |
          export AIRFLOW_HOME=~/airflow
-         export AIRFLOW__CORE__LOAD_EXAMPLES=False
+         export AIRFLOW__CORE__LOAD_EXAMPLES='false'
          #airflow standalone &> airflow.log 2>&1 &
          #sleep 30
          airflow db init
