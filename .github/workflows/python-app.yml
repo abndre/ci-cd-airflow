@@ -24,6 +24,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install apache-airflow==2.4.2
+    -name: Test
+      run: |
+        pytest .
     - name: Start Airflow
       run: |
          export AIRFLOW_HOME=~/airflow
